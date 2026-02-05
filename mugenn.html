@@ -90,6 +90,7 @@
 <div class="container" id="grid-container"></div>
 
 <script>
+    /* 全てこのタグ内で完結させています */
     let audioCtx, noiseNode, gainNode;
 
     function initAudio() {
@@ -181,12 +182,11 @@
         document.getElementById('current-time').innerText = date.toISOString().split('T')[0];
     }
 
-    // --- 1分完結のタイマーロジック ---
     function startDeathTimer() {
         setTimeout(() => {
             document.getElementById('grid-container').classList.add('fade-out-global');
             document.getElementById('footer').classList.add('fade-out-global');
-        }, 60000); // 60秒後に消滅開始
+        }, 60000); 
     }
 
     window.addEventListener('mousedown', initAudio);
