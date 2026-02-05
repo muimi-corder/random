@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRAGMENTED.SYSTEM.V8</title>
+    <style>
+        :root {
+            --bg-color: #030303;
+            --line-color: #1a1a1a;
+            --accent-color: #cc0000;
+            --text-color: #888;
+            --meta-color: #666;
+            --font-main: 'Courier New', Courier, monospace, "MS Mincho", "serif";
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            overflow: hidden; height: 100%;
+        }
+
+        /* 1分後に全体がスッと消えるアニメーション */
+        .fade-out-global {
+            transition: opacity 5s ease-in-out;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            height: 100vh; width: 100vw;
+            border: 1px solid var(--line-color);
+            box-sizing: border-box;
+            transition: opacity 1s;
+        }
+
+        .cell {
+            border: 0.5px solid var(--line-color);
+            padding: 10px;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; background: var(--bg-color);
+            transition: transform 0.8s cubic-bezier(0.2, 1, 0.3, 1), opacity 5s ease-in-out;
+            word-break: break-all; overflow: hidden;
+        }
+
+        .rotated { transform: rotate(var(--rot)); z-index: 2; border-color: #333; }
+
+        .accent-bar {
+            position: absolute; top: 10px; left: 10px;
+            width: 15px; height: 1px; background-color: var(--accent-color);
+            opacity: 0.6;
+        }
+
+        .big-num { font-size: 3rem; opacity: 0.3; font-weight: bold; pointer-events: none; }
+        .poem { writing-mode: vertical-rl; letter-spacing: 0.2em; font-size: 0.8rem; opacity: 0.7; pointer-events: none; }
+        .noise-text { font-size: 0.6rem; opacity: 0.4; line-height: 1.2; pointer-events: none; }
+        .meta-text { color: var(--meta-color); font-size: 0.7rem; opacity: 0.6; cursor: pointer; }
+
+        .shattering {
+            display: inline-block;
+            color: #fff;
+            animation: shatter 0.8s forwards ease-out;
+        }
+
+        @keyframes shatter {
+            to { transform: translate(var(--tx), var(--ty)) rotate(var(--tr)); opacity: 0; }
+        }
+
+        .footer-info {
+            position: fixed; bottom: 8px; left: 10px;
+            font-size: 0.65rem; color: #222; letter-spacing: 2px;
+            pointer-events: none; z-index: 10;
+            transition: opacity 3s;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 0.8; } }
+    </style>
+</head>
+<body>
+
+<div class="footer-info" id="footer">
+    SYSTEM.TIME: <span id="current-time"></span> | TERMINAL_STABILIZED | V8.0
+</div>
+
+<div class="container" id="grid-container"></div>
+
+<script>
+    let audioCtx, noiseNode, gainNode;
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = 4096;
+        let lastOut = 0.0;
+        noiseNode = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+        noiseNode.onaudioprocess = (e) => {
+            const output = e.outputBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                output[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = output[i];
+                output[i] *= 4.0;
+            }
+        };
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0;
+        noiseNode.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+    }
+
+    function burstNoise(duration) {
+        if (!gainNode) initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        gainNode.gain.setTargetAtTime(0.2, audioCtx.currentTime, 0.01);
+        setTimeout(() => { gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); }, duration);
+    }
+
+    const nouns = ["意識", "接続", "回路", "忘却", "記録", "ノイズ", "同期", "残像", "100万", "空白", "呼吸", "断片", "深淵", "エラー", "波形", "沈黙", "境界", "文字列"];
+    const verbs = ["停止する", "加速する", "溶ける", "書き換わる", "浸食する", "反響する", "途絶える", "崩壊する", "漂う", "凝視する"];
+    const adjs = ["冷ややかな", "不透明な", "一度きりの", "不可逆な", "致命的な", "未定義の", "静かな", "ざらついた", "眩しい", "青白い"];
+    const particles = [" / ", " ... ", " の ", " は "];
+    const glitches = ["§", "Δ", "Ø", "Æ", "▰", "▱", "░", "▒", "▓", "✕"];
+    const metaPhrases = ["君は今、何を見ている？", "ブラウザを閉じれば、すべて消える。", "昨日、誰と話した？", "この1分間に、何の意味がある？", "背後に、誰かいないか。", "もう、寝たほうがいい。"];
+
+    function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function generatePoem() { return `${rand(adjs)}${rand(nouns)}${rand(particles)}${rand(nouns)}${rand(verbs)}`; }
+    function generateNoise() {
+        let str = "";
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/_-.";
+        for(let i=0; i<60; i++) str += Math.random() > 0.9 ? rand(glitches) : chars[Math.floor(Math.random()*chars.length)];
+        return str;
+    }
+
+    function shatterEffect(element) {
+        if (element.dataset.broken) return;
+        element.dataset.broken = true;
+        initAudio();
+        burstNoise(800); 
+        const text = element.innerText;
+        element.innerHTML = '';
+        element.style.pointerEvents = 'none';
+        [...text].forEach((char) => {
+            const span = document.createElement('span');
+            span.innerText = char;
+            span.className = 'shattering';
+            span.style.setProperty('--tx', `${(Math.random() - 0.5) * 500}px`);
+            span.style.setProperty('--ty', `${(Math.random() - 0.5) * 500}px`);
+            span.style.setProperty('--tr', `${(Math.random() - 0.5) * 1500}deg`);
+            element.appendChild(span);
+        });
+        setTimeout(() => { element.innerHTML = `<div class="poem" style="animation: fadeIn 2s;">${generatePoem()}</div>`; }, 900);
+    }
+
+    function createGrid() {
+        const container = document.getElementById('grid-container');
+        for (let i = 0; i < 16; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            if (Math.random() > 0.88) {
+                cell.classList.add('rotated');
+                cell.style.setProperty('--rot', `${rand([-90, -15, 15, 90])}deg`);
+            }
+            const type = Math.random();
+            if (type > 0.94) cell.innerHTML = `<div class="meta-text" onmouseover="shatterEffect(this)">${rand(metaPhrases)}</div>`;
+            else if (type > 0.75) cell.innerHTML = `<div class="accent-bar"></div><div class="noise-text">${generateNoise()}</div>`;
+            else if (type > 0.55) cell.innerHTML = `<div class="big-num">${(Math.random()*10).toFixed(1)}rm</div>`;
+            else if (type > 0.25) cell.innerHTML = `<div class="poem">${generatePoem()}</div>`;
+            else cell.innerHTML = `<div class="noise-text" style="opacity:0.1">${rand(glitches)}</div>`;
+            container.appendChild(cell);
+        }
+    }
+
+    function setRandomTime() {
+        const years = [1970, 1998, 2026, 2045, 2099];
+        const date = new Date(rand(years), Math.floor(Math.random()*12), Math.floor(Math.random()*28));
+        document.getElementById('current-time').innerText = date.toISOString().split('T')[0];
+    }
+
+    // --- 1分完結のタイマーロジック ---
+    function startDeathTimer() {
+        setTimeout(() => {
+            document.getElementById('grid-container').classList.add('fade-out-global');
+            document.getElementById('footer').classList.add('fade-out-global');
+        }, 60000); // 60秒後に消滅開始
+    }
+
+    window.addEventListener('mousedown', initAudio);
+    createGrid();
+    setRandomTime();
+    startDeathTimer();
+</script>
+</body>
+</html>
